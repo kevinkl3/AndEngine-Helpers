@@ -123,8 +123,11 @@ public class EffectFactory {
 		float width = pEngine.getCamera().getWidth();
 		float height = pEngine.getCamera().getHeight();
 		
-		final Rectangle blackRect1 = new Rectangle(width*0.5f,height*0.5f,width,height,pEngine.getVertexBufferObjectManager());
-		final Rectangle blackRect2 = new Rectangle(width*0.5f,height*0.5f,width,height,pEngine.getVertexBufferObjectManager());
+		float mCameraCenterX = pEngine.getCamera().getCenterX();
+		float mCameraCenterY = pEngine.getCamera().getCenterY();
+		
+		final Rectangle blackRect1 = new Rectangle(mCameraCenterX,mCameraCenterY,width,height,pEngine.getVertexBufferObjectManager());
+		final Rectangle blackRect2 = new Rectangle(mCameraCenterX,mCameraCenterY,width,height,pEngine.getVertexBufferObjectManager());
 		blackRect1.setColor(Color.BLACK);
 		blackRect2.setColor(Color.BLACK);
 		
