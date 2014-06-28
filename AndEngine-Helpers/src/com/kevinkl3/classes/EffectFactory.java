@@ -7,6 +7,8 @@ import org.andengine.entity.primitive.Rectangle;
 import org.andengine.entity.scene.Scene;
 import org.andengine.entity.sprite.ButtonSprite;
 import org.andengine.entity.sprite.ButtonSprite.OnClickListener;
+import org.andengine.entity.text.Text;
+import org.andengine.opengl.font.Font;
 import org.andengine.opengl.texture.region.ITiledTextureRegion;
 import org.andengine.opengl.vbo.VertexBufferObjectManager;
 import org.andengine.util.adt.color.Color;
@@ -14,7 +16,6 @@ import org.andengine.util.modifier.IModifier;
 import org.andengine.entity.IEntity;
 import org.andengine.input.touch.TouchEvent;
 import org.andengine.util.modifier.IModifier.IModifierListener;
-
 /**
  * 
  * @author Kevin Lopez
@@ -67,6 +68,49 @@ public class EffectFactory {
 		
 		
 		return mButtonSprite;
+	}
+	
+	public static void doFadeOutScaleText(float pX, float pY,Font pfont, String pText,Scene pScene, Engine pEngine){
+		doFadeOutScaleText(pX, pY,pfont, pText, pScene, pEngine, 1.0f, 1.0f, 1.8f);
+	}
+	
+	public static void doFadeOutScaleText(float pX, float pY,Font pfont, String pText,Scene pScene, Engine pEngine,float pDurationSecs){
+		doFadeOutScaleText(pX, pY,pfont, pText, pScene, pEngine, pDurationSecs, 1.0f, 1.8f);
+	}
+	
+	public static void doFadeOutScaleText(float pX, float pY,Font pFont, String pText,Scene pScene, Engine pEngine,float pDurationSecs,float pFromScale, float pToScale){
+		Text mText = new Text(pX,pY,pFont,pText,pEngine.getVertexBufferObjectManager());
+		pScene.attachChild(mText);
+		mText.setCullingEnabled(true);
+		fadeOutScale(mText,pFromScale,pToScale,pDurationSecs,false);
+	}
+	
+	public static void fadeOutScale(IEntity pEntity, float pFromScale, float pToScale, float pDuration,final boolean pDisposeAfter){
+		pEntity.registerEntityModifier(  new ScaleModifier(pDuration, pFromScale, pToScale));
+		AlphaModifier mAlphaMod = new AlphaModifier(pDuration+0.5f,1.0f,0.0f);
+		//TODO fix this
+		/*mAlphaMod.addModifierListener(new IModifierListener<IEntity>(){
+
+			@Override
+			public void onModifierStarted(IModifier<IEntity> pModifier,
+					IEntity pItem) {
+			}
+
+			@Override
+			public void onModifierFinished(IModifier<IEntity> pModifier,
+					IEntity pItem) {
+					if(pDisposeAfter){
+						pItem.detachSelf();
+						pItem.dispose();
+					}
+			}
+			
+		});*/
+		pEntity.registerEntityModifier( mAlphaMod);
+	}
+	
+	public static void fadeOutScale(IEntity pEntity, float pFromScale, float pToScale, float pDuration){
+		fadeOutScale(pEntity, pFromScale, pToScale, pDuration, false);
 	}
 	
 	public static void scaleAnimation(IEntity pEntity, float pFromScale, float pToScale, float pDuration){
