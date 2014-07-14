@@ -10,7 +10,6 @@ import org.andengine.input.touch.detector.SurfaceScrollDetector;
 import org.andengine.input.touch.detector.ClickDetector.IClickDetectorListener;
 import org.andengine.input.touch.detector.ScrollDetector;
 import org.andengine.input.touch.detector.ScrollDetector.IScrollDetectorListener;
-import org.andengine.util.debug.Debug;
 
 /**
  * 
@@ -28,7 +27,7 @@ public class ScrollableScene extends Scene implements  IScrollDetectorListener, 
 	private ScrollDetector mScrollDetector;
     private ClickDetector mClickDetector;
 	IUpdateHandler mScrollHandler;
-    private int mMode;
+	private boolean mMoveX,mMoveY;
     
 	private float mMinX = 0;
     private float mMinY = 0;
@@ -36,9 +35,9 @@ public class ScrollableScene extends Scene implements  IScrollDetectorListener, 
 	private float mMaxY = 480;
     private float mCurrentX = 0;
     private float mCurrentY = 0;
+    private float mXVelocity,mYVelocity;
     
-    private long mTouchStartTime;
-    private float mTouchSumX,mTouchSumY;
+    private long mLastScroll = 0;
     
 	public ScrollableScene(Camera pCamera, float pMinX, float pMinY,float pMaxX,float pMaxY,int pMode){
 		mCamera = pCamera;
@@ -49,7 +48,8 @@ public class ScrollableScene extends Scene implements  IScrollDetectorListener, 
 		
 		mCurrentX = mCamera.getCenterX();
 		mCurrentY = mCamera.getCenterY();
-		mMode = pMode;
+		mMoveX = (pMode == MODE_X || pMode == MODE_XY);
+		mMoveY = (pMode == MODE_Y || pMode == MODE_XY);
 		mScrollDetector = new SurfaceScrollDetector(this);
         mClickDetector = new ClickDetector(this);
         setOnSceneTouchListener(this);
@@ -89,70 +89,94 @@ public class ScrollableScene extends Scene implements  IScrollDetectorListener, 
 	@Override
 	public void onScrollStarted(ScrollDetector pScollDetector, int pPointerID,
 			float pDistanceX, float pDistanceY) {
-		mTouchStartTime = System.currentTimeMillis();
-		mTouchSumX = mTouchSumY= 0;
 		if(mScrollHandler != null)
 			mCamera.unregisterUpdateHandler(mScrollHandler);
 	}
 
 	@Override
 	public void onScroll(ScrollDetector pScollDetector, int pPointerID, float pDistanceX, float pDistanceY) {
+		
+		//Debug.d("onScroll ( " + pDistanceX + " , " + pDistanceY + " )");
 
-		Debug.d("onScroll ( " + pDistanceX + " , " + pDistanceY + " )");
-		mTouchSumX += pDistanceX;
-		mTouchSumY += pDistanceY;
-
-        if ( !((mCurrentX - pDistanceX) < mMinX) && !((mCurrentX - pDistanceX) > mMaxX ) ){//move X
-        	 this.mCamera.offsetCenter(-pDistanceX, 0 );
+		//Move camera onSroll
+		//Move X
+        if ( !((mCurrentX - pDistanceX) < mMinX) && !((mCurrentX - pDistanceX) > mMaxX ) ){
+        	 mCamera.offsetCenter(-pDistanceX, 0 );
              mCurrentX -= pDistanceX;
         }
-        /*
         
-        if ( !((mCurrentY + pDistanceY) < mMinY) && !((mCurrentY + pDistanceY) > mMaxY ) ){//move X
-       	 this.mCamera.offsetCenter(0, pDistanceY );
+        //Move Y
+        if ( !((mCurrentY + pDistanceY) < mMinY) && !((mCurrentY + pDistanceY) > mMaxY ) ){
+       	 	mCamera.offsetCenter(0, pDistanceY );
             mCurrentY += pDistanceY;
-        	if(this.mCamera.getCenterY()<0 ){
-        		this.mCamera.offsetCenter(mCurrentX,0 );
-        		mCurrentY=0;
-        	}
-       }*/
-        
-       
-        
+       }
+        long dt = System.currentTimeMillis() - mLastScroll;
+        mXVelocity = ( (pDistanceX*1000)/ dt );
+        mYVelocity = ( (pDistanceY*1000)/ dt );
+        mLastScroll = System.currentTimeMillis();
+        //Debug.d("Instant velocity x: " + mXVelocity);
+        //Debug.d("Instant velocity Y: " + mYVelocity);
 	}
 
 	@Override
-	public void onScrollFinished(ScrollDetector pScollDetector, int pPointerID,
-			float pDistanceX, float pDistanceY) {
-		long timeElapse = System.currentTimeMillis() - mTouchStartTime;
-		Debug.d("Scroll Finished at: " + System.currentTimeMillis());
-		Debug.d("Touch Time: " + timeElapse);
-		Debug.d("values ( " + pDistanceX + " , " + pDistanceY + " )");
-		Debug.d("SUM x: " + mTouchSumX +"  y: " + mTouchSumY);
-		final long velX = (long) ( ((long)mTouchSumX*1000)/timeElapse);//V = d/t
-		Debug.d("VelX: " + velX);
-		final float deaccelarationX = Math.abs(velX*0.6f);
-		final boolean direction = velX > 0;
+	public void onScrollFinished(ScrollDetector pScollDetector, int pPointerID, float pDistanceX, float pDistanceY) {
+		//Debug.d("Scroll Finished at: " + System.currentTimeMillis());
+		
+		final float deaccelarationX = Math.abs(mXVelocity*0.6f);
+		final float deaccelarationY = Math.abs(mYVelocity*0.6f);
+		final boolean directionX = mXVelocity > 0;
+		final boolean directionY = mYVelocity > 0;
 		
 		mScrollHandler = new IUpdateHandler(){
-			float factorX = velX;
-			
+			float factorX = mXVelocity;
+			float factorY = mYVelocity;
+	
 			@Override
 			public void onUpdate(float pSecondsElapsed) {
-        	 	//d = v*t
-				float dx = factorX*pSecondsElapsed;
-				if ( !((mCurrentX - dx) < mMinX) && !((mCurrentX - dx) > mMaxX ) ){
-						mCamera.offsetCenter(-dx, 0 );
-						mCurrentX -= dx;
-				}
-				
-				factorX += (direction ? -1 : 1)*(deaccelarationX*pSecondsElapsed);//V = Vo + a*t
-				if(direction){
-					if(factorX < 0){
+				//MOVE X
+				if(mMoveX){
+					//d = v*t
+					float dx = factorX*pSecondsElapsed;
+					if ( !((mCurrentX - dx) < mMinX) && !((mCurrentX - dx) > mMaxX ) ){
+							mCamera.offsetCenter(-dx, 0 );
+							mCurrentX -= dx;
+					}else{
 						mCamera.unregisterUpdateHandler(this);
 					}
-				}else if(factorX > 0){
-					mCamera.unregisterUpdateHandler(this);
+					
+					//Check if velocity reached 0
+					if(directionX){
+						if(factorX < 0){
+							mCamera.unregisterUpdateHandler(this);
+						}
+					}else if(factorX > 0){
+						mCamera.unregisterUpdateHandler(this);
+					}
+					
+					factorX += (directionX ? -1 : 1)*(deaccelarationX*pSecondsElapsed);//V = Vo + a*t
+				}
+				
+				//MOVE Y
+				if(mMoveY){
+					//d = v*t
+					float dy = factorY*pSecondsElapsed;
+					if ( !((mCurrentY + dy) < mMinY) && !((mCurrentY + dy) > mMaxY ) ){
+							mCamera.offsetCenter(0, dy );
+							mCurrentY += dy;
+					}else{
+						mCamera.unregisterUpdateHandler(this);
+					}
+					
+					//Check if velocity reached 0
+					if(directionY){
+						if(factorY < 0){
+							mCamera.unregisterUpdateHandler(this);
+						}
+					}else if(factorY > 0){
+						mCamera.unregisterUpdateHandler(this);
+					}
+					
+					factorY += (directionY ? -1 : 1)*(deaccelarationY*pSecondsElapsed);//V = Vo + a*t
 				}
 			}
 
@@ -163,6 +187,7 @@ public class ScrollableScene extends Scene implements  IScrollDetectorListener, 
 		};
 		
 		mCamera.registerUpdateHandler( mScrollHandler );
+		mLastScroll = 0;
 	}
 	
 }
